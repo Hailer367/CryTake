@@ -171,8 +171,8 @@ app.post('/api/target/:deviceId', (req, res) => {
   }
 });
 
-// Cleanup offline devices
-setInterval(() => {
+// Offline check (inline - no setInterval in serverless)
+function cleanupOfflineDevices() {
   const now = Date.now();
   for (const [deviceId, device] of Object.entries(registeredDevices)) {
     const lastSeen = new Date(device.lastSeen).getTime();
@@ -180,18 +180,18 @@ setInterval(() => {
       device.online = false;
     }
   }
-}, 30000);
+}
 
 function Log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`);
 }
 
-// Start server
-if (!process.env.VERCEL) {
+// Start server (only in local non-Vercel environment)
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    Log(`🌐 CryTake Dashboard API server running on port ${PORT}`);
-    Log(`📲 Admin token: ${ADMIN_TOKEN}`);
+    Log(`Server running on port ${PORT}`);
+    Log(`Admin token: ${ADMIN_TOKEN}`);
   });
 }
 
