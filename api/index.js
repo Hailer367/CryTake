@@ -248,7 +248,15 @@ app.get('/api/status', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: Date.now() });
+  res.json({ 
+    status: 'healthy', 
+    timestamp: Date.now(),
+    config: {
+      botTokenSet: !!TELEGRAM_BOT_TOKEN,
+      chatIdSet: !!TELEGRAM_CHAT_ID,
+      adminTokenSet: !!ADMIN_TOKEN
+    }
+  });
 });
 
 // API: Receive captured data from Decry app (alternative to Telegram direct send)
