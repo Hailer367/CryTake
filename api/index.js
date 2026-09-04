@@ -4,7 +4,6 @@ const crypto = require('crypto');
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin';
 
@@ -25,9 +24,9 @@ function isAdmin(req) {
   return token === ADMIN_TOKEN;
 }
 
-// Serve dashboard
+// Serve dashboard - path adjusted for api/ subdirectory
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 // API: List all registered devices
