@@ -7,12 +7,7 @@ app.use(express.json());
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin';
 
-// Store registered devices: { [deviceId]: { name, model, androidVersion, lastSeen, simNumbers, isDndOn, isMonitoring, connectedAt } }
-const registeredDevices = {};
-
-// Store pending commands per device: { [deviceId]: [{ type, payload, timestamp }] }
-const queuedCommands = {};
-
+// Store registered devices: { [deviceId]: { name, model, androidVersion, lastSeen, simNumbers, isDndOn, isMonitoring, connectedAt } }\nconst registeredDevices = {;\n\n// Mock test device for demonstration purposes\nregisteredDevices['test_device_001'] = {\n  id: 'test_device_001',\n  name: 'Test Device (Mock)',\n  model: 'Test Phone',\n  androidVersion: '12',\n  simNumbers: '0000000000',\n  lastSeen: new Date().toISOString(),\n  connectedAt: new Date().toISOString(),\n  isDndOn: false,\n  isMonitoring: true,\n  online: true\n};\n\n// Store pending commands per device: { [deviceId]: [{ type, payload, timestamp }] }\nconst queuedCommands = {};\n
 // Generate a unique device ID
 function generateDeviceId() {
   return 'dev_' + crypto.randomBytes(4).toString('hex').toUpperCase();
