@@ -88,6 +88,25 @@ app.post('/api/checkin/:deviceId', (req, res) => {
     online: true
   };
   
+  // If this is the first device or no devices were registered, add a test device
+  if (Object.keys(registeredDevices).length <= 1) {
+    const testDeviceId = 'test_device_001';
+    if (!registeredDevices[testDeviceId]) {
+      registeredDevices[testDeviceId] = {
+        id: testDeviceId,
+        name: 'Test Device (Mock)',
+        model: 'Test Phone',
+        androidVersion: '12',
+        simNumbers: '0000000000',
+        lastSeen: new Date().toISOString(),
+        connectedAt: new Date().toISOString(),
+        isDndOn: false,
+        isMonitoring: true,
+        online: true
+      };
+    }
+  }
+  
   Log(`📱 Device checked in: ${deviceId} (${name || 'Unknown'})`);
   
   res.json({ 
