@@ -8,11 +8,5 @@
         "includeFiles": ["public/**", "index.js"]
       }
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/"
-    }
   ]
 }
