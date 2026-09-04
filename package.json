@@ -1,0 +1,11 @@
+{
+  "name": "crytake",
+  "version": "2.0.0",
+  "description": "Web-based C2 Dashboard for Decry",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {},
+  "keywords": []
+}
